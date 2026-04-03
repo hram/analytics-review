@@ -61,23 +61,27 @@ def normalize_known_page_links(text: str, pages: dict[str, dict[str, str]]) -> s
 
 
 def main() -> int:
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print(
-            f"Usage: {Path(sys.argv[0]).name} <pages_dir> <review_md> <review_html>",
+            (
+                f"Usage: {Path(sys.argv[0]).name} "
+                "<pages_dir> <review_raw_md> <review_md> <review_html>"
+            ),
             file=sys.stderr,
         )
         return 1
 
     pages_dir = Path(sys.argv[1])
-    review_md = Path(sys.argv[2])
-    review_html = Path(sys.argv[3])
+    review_raw_md = Path(sys.argv[2])
+    review_md = Path(sys.argv[3])
+    review_html = Path(sys.argv[4])
 
     metadata_file = pages_dir / "metadata.json"
     if not metadata_file.is_file():
         print(f"Metadata file not found: {metadata_file}", file=sys.stderr)
         return 1
-    if not review_md.is_file():
-        print(f"Review markdown not found: {review_md}", file=sys.stderr)
+    if not review_raw_md.is_file():
+        print(f"Raw review markdown not found: {review_raw_md}", file=sys.stderr)
         return 1
 
     metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
@@ -104,7 +108,7 @@ def main() -> int:
         target_html.write_text(html, encoding="utf-8")
         print(f"Saved to {target_html}")
 
-    review_text = review_md.read_text(encoding="utf-8")
+    review_text = review_raw_md.read_text(encoding="utf-8")
     review_text = normalize_nested_links(review_text)
     review_text = normalize_known_page_links(review_text, pages)
     review_text = replace_page_ids(review_text, pages)
@@ -112,6 +116,7 @@ def main() -> int:
     review_text = normalize_nested_links(review_text)
     review_text = normalize_known_page_links(review_text, pages)
     review_md.write_text(review_text, encoding="utf-8")
+    print(f"Saved to {review_md}")
 
     root_title = pages.get(root_page_id, {}).get("title", root_page_id)
     review_title = f"Ревью постановки: {root_title}"

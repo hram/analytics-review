@@ -39,6 +39,22 @@ def env_flag(name: str) -> bool:
     return value in {"1", "true", "yes", "on"}
 
 
+def env_float(name: str, default: float) -> float:
+    raw_value = os.environ.get(name, "").strip()
+    if not raw_value:
+        return default
+
+    try:
+        value = float(raw_value)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be a number, got: {raw_value}") from exc
+
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0, got: {raw_value}")
+
+    return value
+
+
 def build_ssl_context() -> ssl.SSLContext:
     ca_file = os.environ.get("CONF_CA_FILE", "").strip()
     if ca_file:
@@ -53,10 +69,19 @@ def build_ssl_context() -> ssl.SSLContext:
     return ssl.create_default_context()
 
 
-def fetch_json(url: str, auth: str, ssl_context: ssl.SSLContext) -> dict:
+def fetch_json(
+    url: str,
+    auth: str,
+    ssl_context: ssl.SSLContext,
+    timeout_seconds: float,
+) -> dict:
     req = urllib.request.Request(url, headers={"Authorization": auth})
 
-    with urllib.request.urlopen(req, context=ssl_context) as resp:
+    with urllib.request.urlopen(
+        req,
+        context=ssl_context,
+        timeout=timeout_seconds,
+    ) as resp:
         return json.load(resp)
 
 
@@ -122,9 +147,10 @@ def fetch_page(
     auth: str,
     page_id: str,
     ssl_context: ssl.SSLContext,
+    timeout_seconds: float,
 ) -> dict:
     url = f"{base_url.rstrip('/')}/rest/api/content/{page_id}?expand=body.storage"
-    data = fetch_json(url, auth, ssl_context)
+    data = fetch_json(url, auth, ssl_context, timeout_seconds)
 
     try:
         html = data["body"]["storage"]["value"]
@@ -147,6 +173,7 @@ def fetch_child_page_ids(
     auth: str,
     page_id: str,
     ssl_context: ssl.SSLContext,
+    timeout_seconds: float,
 ) -> list[str]:
     next_url = (
         f"{base_url.rstrip('/')}/rest/api/content/"
@@ -155,7 +182,7 @@ def fetch_child_page_ids(
     child_ids: list[str] = []
 
     while next_url:
-        data = fetch_json(next_url, auth, ssl_context)
+        data = fetch_json(next_url, auth, ssl_context, timeout_seconds)
         for item in data.get("results", []):
             child_id = item.get("id")
             if child_id is not None:
@@ -178,12 +205,13 @@ def save_page_tree(
     visited: set[str],
     metadata: dict[str, dict[str, str]],
     ssl_context: ssl.SSLContext,
+    timeout_seconds: float,
 ) -> int:
     if page_id in visited:
         return 0
     visited.add(page_id)
 
-    page = fetch_page(base_url, auth, page_id, ssl_context)
+    page = fetch_page(base_url, auth, page_id, ssl_context, timeout_seconds)
     markdown = page["markdown"]
     output_file = output_dir / f"{page_id}.md"
     output_file.write_text(markdown, encoding="utf-8")
@@ -198,9 +226,22 @@ def save_page_tree(
     }
 
     saved_count = 1
-    for child_id in fetch_child_page_ids(base_url, auth, page_id, ssl_context):
+    for child_id in fetch_child_page_ids(
+        base_url,
+        auth,
+        page_id,
+        ssl_context,
+        timeout_seconds,
+    ):
         saved_count += save_page_tree(
-            base_url, auth, child_id, output_dir, visited, metadata, ssl_context
+            base_url,
+            auth,
+            child_id,
+            output_dir,
+            visited,
+            metadata,
+            ssl_context,
+            timeout_seconds,
         )
 
     return saved_count
@@ -231,14 +272,24 @@ def main() -> int:
         print("CONF_AUTH is required in .env", file=sys.stderr)
         return 1
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    ssl_context = build_ssl_context()
-
     try:
+        timeout_seconds = env_float("CONF_REQUEST_TIMEOUT", 30.0)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        ssl_context = build_ssl_context()
         metadata: dict[str, dict[str, str]] = {}
         saved_count = save_page_tree(
-            base_url, auth, page_id, output_dir, set(), metadata, ssl_context
+            base_url,
+            auth,
+            page_id,
+            output_dir,
+            set(),
+            metadata,
+            ssl_context,
+            timeout_seconds,
         )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     except urllib.error.HTTPError as exc:
         print(f"HTTP error {exc.code}: {exc.reason}", file=sys.stderr)
         return 1

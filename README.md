@@ -43,6 +43,7 @@ CONF_AUTH='Basic REPLACE_ME'
 `CONF_AUTH` должен содержать готовое значение заголовка `Authorization`, например `Basic ...`.
 
 При необходимости можно использовать другой env-файл через переменную `CONF_ENV_FILE`.
+Таймаут запросов к Confluence можно настроить через `CONF_REQUEST_TIMEOUT` в секундах. По умолчанию используется `30`.
 
 Для HTTPS Confluence с внутренним сертификатом есть два варианта:
 
@@ -54,6 +55,7 @@ CONF_AUTH='Basic REPLACE_ME'
 ```env
 CONF_BASE_URL='https://confluence.example.local'
 CONF_AUTH='Basic REPLACE_ME'
+CONF_REQUEST_TIMEOUT='30'
 CONF_CA_FILE='/etc/ssl/certs/company-root-ca.pem'
 ```
 
@@ -135,19 +137,20 @@ CONF_INSECURE_SKIP_VERIFY='true'
 ### 4. Собрать финальный HTML-бандл review + страницы
 
 ```bash
-.venv/bin/python decorate_review_bundle.py <pages_dir> <review_md> <review_html>
+.venv/bin/python decorate_review_bundle.py <pages_dir> <review_raw_md> <review_md> <review_html>
 ```
 
 Пример:
 
 ```bash
-.venv/bin/python decorate_review_bundle.py ./pages ./review.md ./review.html
+.venv/bin/python decorate_review_bundle.py ./pages ./review.raw.md ./review.md ./review.html
 ```
 
 Что делает:
 
 - рендерит HTML для каждой страницы;
 - добавляет ссылки на Confluence и обратную ссылку на review;
+- читает сырой review и сохраняет постобработанный Markdown отдельно;
 - заменяет упоминания `page id` в review на ссылки на HTML-страницы;
 - сохраняет итоговый HTML review.
 
@@ -174,6 +177,7 @@ out/<page_id>/
     metadata.json
     <page_id>.md
     <page_id>-<slug>.html
+  review_<page_id>.raw.md
   review_<page_id>.md
   review_<page_id>.html
 ```
@@ -182,6 +186,7 @@ out/<page_id>/
 
 - `pages/*.md` — выгруженные страницы в Markdown;
 - `pages/*.html` — HTML-версии отдельных страниц;
+- `review_<page_id>.raw.md` — сырой ответ `codex` без постобработки;
 - `review_<page_id>.md` — итоговое ревью;
 - `review_<page_id>.html` — HTML-версия ревью с ссылками на страницы.
 
@@ -202,8 +207,8 @@ out/<page_id>/
 Переиспользовать уже выгруженные страницы и пересобрать review с другим prompt:
 
 ```bash
-./review_confluence_pages.sh ./tmp/pages ./tmp/review.md ./prompt_pragmatic.md
-.venv/bin/python decorate_review_bundle.py ./tmp/pages ./tmp/review.md ./tmp/review.html
+./review_confluence_pages.sh ./tmp/pages ./tmp/review.raw.md ./prompt_pragmatic.md
+.venv/bin/python decorate_review_bundle.py ./tmp/pages ./tmp/review.raw.md ./tmp/review.md ./tmp/review.html
 ```
 
 ## Возможные проблемы
