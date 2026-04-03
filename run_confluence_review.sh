@@ -19,6 +19,8 @@ REVIEW_FILE="${RUN_DIR}/review_${PAGE_ID}.md"
 REVIEW_HTML_FILE="${RUN_DIR}/review_${PAGE_ID}.html"
 
 mkdir -p "$RUN_DIR"
+rm -rf "$PAGES_DIR"
+mkdir -p "$PAGES_DIR"
 
 if [[ ! -f "$PROMPT_FILE" ]]; then
   echo "Prompt file not found: $PROMPT_FILE" >&2
