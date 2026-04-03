@@ -2,15 +2,17 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 if [[ $# -lt 2 || $# -gt 3 ]]; then
   echo "Usage: $0 <pages_dir> <output_file> [prompt_file]" >&2
-  echo "Example: $0 /home/hram/review/pages_244908187_1774354653 /home/hram/review/review_244908187.md /home/hram/review/prompt.md" >&2
+  echo "Example: $0 ${SCRIPT_DIR}/pages_244908187_1774354653 ${SCRIPT_DIR}/review_244908187.md ${SCRIPT_DIR}/prompt.md" >&2
   exit 1
 fi
 
 PAGES_DIR="$1"
 OUTPUT_FILE="$2"
-PROMPT_FILE="${3:-/home/hram/review/prompt.md}"
+PROMPT_FILE="${3:-${SCRIPT_DIR}/prompt.md}"
 
 if [[ ! -d "$PAGES_DIR" ]]; then
   echo "Pages directory not found: $PAGES_DIR" >&2
